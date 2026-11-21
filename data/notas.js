@@ -14,8 +14,8 @@ window.NOTAS = [
     {
         fecha: "2026-11-20",
         titulo: "Bienvenida a tu bloc",
-        texto: `Este es tu bloc de notas.
+        texto: `“Lo que uno quiere de verdad, es lo que está hecho para uno; entonces hay que tomarlo, o intentar.”
 
-Aquí te iré escribiendo cosas de poco a poco.`
+— Mario Benedetti`
     }
 ];
