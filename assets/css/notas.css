@@ -1,0 +1,301 @@
+/* =========================================================
+   Bloc de notas (notas.html)
+   ========================================================= */
+
+.nav .brand {
+    margin-right: auto;
+    font-size: 1.2rem;
+}
+
+.notes-page {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 26px) 16px calc(40px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------- Candado ---------- */
+.lock-wrap {
+    min-height: calc(100dvh - var(--nav-h) - 80px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lock-card {
+    width: min(100%, 380px);
+    padding: 34px 24px 24px;
+    text-align: center;
+    transform: rotate(-1.5deg);
+    animation: lock-in 0.8s var(--ease-pop) both;
+}
+
+@keyframes lock-in {
+    from { opacity: 0; transform: translateY(40px) rotate(-6deg) scale(0.92); }
+    to { opacity: 1; transform: rotate(-1.5deg); }
+}
+
+.lock-card.shake {
+    animation: shake 0.45s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: rotate(-1.5deg) translateX(0); }
+    20% { transform: rotate(-1.5deg) translateX(-10px); }
+    40% { transform: rotate(-1.5deg) translateX(9px); }
+    60% { transform: rotate(-1.5deg) translateX(-6px); }
+    80% { transform: rotate(-1.5deg) translateX(4px); }
+}
+
+.lock-card.opening {
+    animation: lock-out 0.7s var(--ease-soft) 0.45s forwards;
+}
+
+@keyframes lock-out {
+    to { opacity: 0; transform: translateY(-30px) rotate(4deg) scale(0.9); }
+}
+
+.padlock {
+    width: 78px;
+    height: 78px;
+    margin: 0 auto 8px;
+    color: var(--ink);
+    animation: bob 3s ease-in-out infinite;
+}
+
+.padlock svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.shackle {
+    transform-origin: 44px 30px;
+    transition: transform 0.45s var(--ease-pop);
+}
+
+.opening .shackle {
+    transform: translateY(-7px) rotate(28deg);
+}
+
+@keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.lock-title {
+    margin: 0;
+    font-family: var(--font-title);
+    font-weight: 800;
+    font-size: 1.9rem;
+}
+
+.lock-sub {
+    margin: 6px 0 18px;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+}
+
+.pass-row {
+    position: relative;
+}
+
+.pass-row input {
+    width: 100%;
+    padding: 13px 48px 13px 16px;
+    border-radius: 14px;
+    border: 2.5px solid rgba(var(--ink-rgb), 0.9);
+    background: #fffdf8;
+    color: #1E2B30;
+    font-size: 1.05rem;
+    box-shadow: inset 2px 2px 0 rgba(30, 43, 48, 0.08);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+[data-theme="night"] .pass-row input {
+    border-color: rgba(243, 234, 217, 0.6);
+}
+
+.pass-row input:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 4px rgba(14, 124, 123, 0.25);
+}
+
+.eye {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    font-size: 1.1rem;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.eye[aria-pressed="true"] {
+    opacity: 1;
+}
+
+.lock-submit {
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px;
+    font-size: 1.05rem;
+}
+
+.lock-msg {
+    min-height: 1.4em;
+    margin: 12px 0 0;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--pink);
+}
+
+[data-theme="night"] .lock-msg {
+    color: #ff8fb0;
+}
+
+/* ---------- Lista de notas ---------- */
+.notes-head {
+    margin-bottom: 26px;
+    animation: head-in 0.7s var(--ease-pop) both;
+}
+
+@keyframes head-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: none; }
+}
+
+.notes-kicker {
+    display: inline-block;
+    margin: 0 0 8px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--orange);
+    color: #1E2B30;
+    border: 2px solid #1E2B30;
+    font-family: var(--font-title);
+    font-weight: 800;
+    font-size: 0.8rem;
+    box-shadow: 2px 3px 0 #1E2B30;
+}
+
+.notes-title {
+    margin: 0;
+    font-family: var(--font-title);
+    font-weight: 800;
+    font-size: clamp(2rem, 8vw, 2.8rem);
+    line-height: 1.05;
+    color: #fff;
+    -webkit-text-stroke: 1.5px #1E2B30;
+    paint-order: stroke fill;
+    text-shadow: 3px 4px 0 #1E2B30;
+}
+
+.notes-count {
+    display: inline-block;
+    margin: 12px 0 0;
+    padding: 6px 12px;
+    border-radius: 12px;
+    background: rgba(247, 240, 228, 0.88);
+    color: #1E2B30;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 2px 3px 0 rgba(30, 43, 48, 0.85);
+}
+
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 34px;
+}
+
+.note {
+    position: relative;
+    padding: 30px 22px 24px 44px;
+    border-radius: var(--radius);
+    background:
+        linear-gradient(90deg, transparent 28px, rgba(224, 36, 94, 0.4) 28px, rgba(224, 36, 94, 0.4) 30px, transparent 30px),
+        repeating-linear-gradient(180deg, transparent 0 29px, var(--paper-line) 29px 31px),
+        var(--paper);
+    background-position: 0 0, 0 14px, 0 0;
+    color: var(--ink);
+    box-shadow: var(--sticker);
+}
+
+.note:nth-child(odd) { --r: -0.8deg; }
+.note:nth-child(even) { --r: 0.9deg; }
+
+.note .tape {
+    left: 50%;
+    margin-left: -37px;
+    transform: rotate(-3deg);
+}
+
+.note:nth-child(even) .tape {
+    background: rgba(14, 124, 123, 0.62);
+    transform: rotate(4deg);
+}
+
+.note-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px;
+    font-family: var(--font-title);
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    color: var(--teal);
+}
+
+[data-theme="night"] .note-date {
+    color: #5ed0cc;
+}
+
+.note-new {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--orange);
+    color: #1E2B30;
+    font-size: 0.7rem;
+}
+
+.note-title {
+    margin: 0 0 10px;
+    font-family: var(--font-title);
+    font-weight: 800;
+    font-size: 1.45rem;
+    line-height: 1.2;
+}
+
+.note-text {
+    margin: 0;
+    font-size: 1.02rem;
+    line-height: 30px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.note-sign {
+    margin: 14px 0 0;
+    text-align: right;
+    font-family: var(--font-title);
+    font-weight: 700;
+    color: var(--orange-deep);
+}
+
+.empty {
+    padding: 30px 22px;
+    text-align: center;
+    font-family: var(--font-title);
+    font-weight: 700;
+    font-size: 1.1rem;
+}

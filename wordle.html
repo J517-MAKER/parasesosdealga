@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#f0f4f8" id="meta-theme">
+    <meta name="description" content="Wordle en español latino: adivina la palabra de 5 letras en 6 intentos.">
+    <title>Wordle 2</title>
+    <style>
+        :root {
+            /* Paleta cielo: día por defecto */
+            --bg: #f0f4f8;
+            --bg-glow: #ffffff;
+            --surface: rgba(255, 255, 255, 0.9);
+            --surface-solid: #ffffff;
+            --text: #2c3e50;
+            --heading: #48596c;
+            --heading-dark: #374655;
+            --muted: #5f7181;
+
+            --correct: #6b95c0;
+            /* azul cielo */
+            --present: #9a86d2;
+            /* lavanda */
+            --absent: #7d8c97;
+            /* gris nube oscuro */
+            --on-state: #ffffff;
+            /* texto sobre los estados */
+            --sky-rgb: 107, 149, 192;
+            --lavender-rgb: 154, 134, 210;
+            --shadow-rgb: 90, 110, 133;
+
+            --tile-bg: rgba(255, 255, 255, 0.82);
+            --tile-border: #b5c2cd;
+            --tile-text: #48596c;
+            --key: rgba(209, 216, 224, 0.88);
+            --key-text: #2c3e50;
+            --disabled: rgba(227, 232, 238, 0.72);
+            --danger: #f2b8bd;
+            --danger-dark: #6b1f26;
+
+            --radius: 8px;
+            --radius-key: 4px;
+            --flip-duration: 500ms;
+            /* JS lo sobrescribe para mantenerse sincronizado */
+
+            /* Alto de ventana: vh como respaldo, dvh si el navegador lo soporta */
+            --vh: 100vh;
+            --tile: min(62px, calc((100vw - 60px) / 5.4), calc((var(--vh) - 340px) / 6.6));
+        }
+
+        /* Tema Atardecer */
+        [data-theme="sunset"] {
+            --bg: #2b1731;
+            --bg-glow: #4a2452;
+            --surface: rgba(54, 28, 62, 0.92);
+            --surface-solid: #361c3e;
+            --text: #fdf2f8;
+            --heading: #f9a8d4;
+            --heading-dark: #fbcfe8;
+            --muted: #e9d5ff;
+
+            --tile-bg: rgba(62, 32, 72, 0.8);
+            --tile-border: #8d4a94;
+            --tile-text: #fdf2f8;
+            --key: rgba(86, 46, 98, 0.9);
+            --key-text: #fdf2f8;
+            --disabled: rgba(48, 22, 56, 0.7);
+            --shadow-rgb: 35, 10, 42;
+        }
+
+        /* Tema Noche */
+        [data-theme="night"] {
+            --bg: #090e1d;
+            --bg-glow: #162444;
+            --surface: rgba(18, 28, 48, 0.92);
+            --surface-solid: #121c30;
+            --text: #e2e8f0;
+            --heading: #93c5fd;
+            --heading-dark: #bfdbfe;
+            --muted: #94a3b8;
+
+            --tile-bg: rgba(22, 34, 58, 0.8);
+            --tile-border: #3b4e6d;
+            --tile-text: #f8fafc;
+            --key: rgba(36, 54, 86, 0.9);
+            --key-text: #f8fafc;
+            --disabled: rgba(18, 28, 48, 0.7);
+            --shadow-rgb: 0, 0, 0;
+        }
+
+        @supports (height: 100dvh) {
+            :root {
+                --vh: 100dvh;
+            }
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, system-ui, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: none;
+            transition: color 0.4s ease, background-color 0.4s ease;
+        }
+
+        body {
+            margin: 0;
+            height: var(--vh);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: transparent;
+            touch-action: manipulation;
+            /* evita el zoom por doble toque sin bloquear el zoom accesible */
+        }
+
+        /* Canvas de cielo dinámico con nubes */
+        #sky-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+            transform: translateZ(0);
+            will-change: transform;
+        }
+
+        button {
+            font: inherit;
+            cursor: pointer;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--present);
+            outline-offset: 2px;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+
+        /* ---------- Encabezado ---------- */
+        header {
+            position: relative;
+            text-align: center;
+            padding: 8px 14px 8px;
+            border-bottom: 1px solid rgba(var(--shadow-rgb), 0.15);
+            background: rgba(var(--surface-solid, 255, 255, 255), 0.22);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: background 0.4s ease, border-color 0.4s ease;
+        }
+
+        .header-inner {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.5rem, 6vw, 2.2rem);
+            letter-spacing: 0.15em;
+            font-weight: 800;
+            color: var(--heading);
+            transition: color 0.4s ease;
+        }
+
+        .sky-btn {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(var(--shadow-rgb), 0.25);
+            background: var(--surface);
+            color: var(--heading);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            font-size: 1.15rem;
+            line-height: 1;
+            box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.15);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease, border-color 0.3s ease;
+        }
+
+        /* Botón para volver al menú (izquierda) */
+        .menu-btn {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 1px solid rgba(var(--shadow-rgb), 0.25);
+            background: var(--surface);
+            color: var(--heading);
+            text-decoration: none;
+            box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.15);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .menu-btn:hover {
+            transform: translateY(-50%) translateX(-2px) scale(1.1);
+        }
+
+        .menu-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .sky-btn:hover {
+            transform: translateY(-50%) scale(1.12);
+        }
+
+        .sky-btn:active {
+            transform: translateY(-50%) scale(0.92);
+        }
+
+        #plays {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+            font-size: 0.8rem;
+            color: var(--muted);
+            transition: color 0.4s ease;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid var(--correct);
+            opacity: 0.6;
+        }
+
+        .dot.on {
+            background: var(--correct);
+            opacity: 1;
+            box-shadow: 0 0 6px rgba(var(--sky-rgb), 0.5);
+        }
+
+        .subtitle {
+            margin: 4px 0 0;
+            font-size: 0.85rem;
+            font-style: italic;
+            color: var(--muted);
+            transition: color 0.4s ease;
+        }
+
+        /* ---------- Tablero ---------- */
+        main {
+            flex: 1;
+            display: grid;
+            place-items: center;
+            padding: 10px;
+            min-height: 0;
+        }
+
+        .board {
+            display: grid;
+            gap: 6px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(5, var(--tile));
+            gap: 6px;
+        }
+
+        .row.shake {
+            animation: shake 450ms;
+        }
+
+        .tile {
+            height: var(--tile);
+            border: 2px solid var(--tile-border);
+            border-radius: var(--radius);
+            display: grid;
+            place-items: center;
+            font-size: calc(var(--tile) * 0.55);
+            font-weight: 800;
+            user-select: none;
+            background: var(--tile-bg);
+            color: var(--tile-text);
+            transition: background-color 300ms, border-color 300ms, color 300ms;
+        }
+
+        .tile.filled {
+            border-color: var(--correct);
+            box-shadow: 0 2px 8px rgba(var(--sky-rgb), 0.2);
+            animation: pop 100ms;
+        }
+
+        .tile.flip {
+            animation: flip var(--flip-duration) ease;
+        }
+
+        /* Estados: misma especificidad que .tile.filled y declarados después, sin !important */
+        .tile.correct,
+        .tile.present,
+        .tile.absent {
+            color: var(--on-state);
+            border-color: transparent;
+            box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.18);
+        }
+
+        .tile.correct {
+            background: var(--correct);
+        }
+
+        .tile.present {
+            background: var(--present);
+        }
+
+        .tile.absent {
+            background: var(--absent);
+            box-shadow: none;
+        }
+
+        @keyframes pop {
+            50% {
+                transform: scale(1.12);
+            }
+        }
+
+        @keyframes flip {
+            50% {
+                transform: rotateX(90deg);
+            }
+        }
+
+        @keyframes shake {
+
+            10%,
+            90% {
+                transform: translateX(-2px);
+            }
+
+            20%,
+            80% {
+                transform: translateX(4px);
+            }
+
+            30%,
+            50%,
+            70% {
+                transform: translateX(-6px);
+            }
+
+            40%,
+            60% {
+                transform: translateX(6px);
+            }
+        }
+
+        /* ---------- Teclado ---------- */
+        #keyboard {
+            width: 100%;
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 6px 6px calc(10px + env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .kb-row {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .key {
+            flex: 1 1 0;
+            max-width: 46px;
+            height: 56px;
+            padding: 0;
+            border: none;
+            border-radius: var(--radius-key);
+            background: var(--key);
+            color: var(--key-text);
+            font-size: 1.2rem;
+            /* ≥ 18.66px en negrita = "texto grande" WCAG */
+            font-weight: 700;
+            user-select: none;
+            box-shadow: 0 1px 0 rgba(var(--shadow-rgb), 0.25);
+            transition: background-color 200ms, color 200ms, transform 50ms;
+        }
+
+        .key:active {
+            transform: scale(0.95);
+        }
+
+        .key.wide {
+            flex-grow: 1.6;
+            max-width: 74px;
+            font-size: 0.75rem;
+        }
+
+        .key.backspace {
+            font-size: 1.3rem;
+        }
+
+        .key.enter {
+            background: var(--heading);
+            color: var(--on-state);
+        }
+
+        /* ---------- Botón corazón (debajo del botón del cielo) ---------- */
+        .heart-btn {
+            position: absolute;
+            right: 0;
+            top: calc(50% + 24px);
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 120, 160, 0.55);
+            background: linear-gradient(145deg, #ff86ab, #e0245e);
+            color: #fff;
+            text-decoration: none;
+            box-shadow: 0 2px 10px rgba(255, 80, 130, 0.45);
+            animation: latido 1.6s ease-in-out infinite;
+            -webkit-tap-highlight-color: transparent;
+            z-index: 2;
+        }
+
+        /* En pantallas angostas, que el texto no quede debajo del corazón */
+        @media (max-width: 520px) {
+            #plays {
+                padding: 0 44px;
+            }
+        }
+
+        .heart-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .heart-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        @keyframes latido {
+            0%, 100% { transform: scale(1); }
+            15% { transform: scale(1.08); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.05); }
+        }
+
+        .key.correct,
+        .key.present,
+        .key.absent {
+            color: var(--on-state);
+        }
+
+        .key.correct {
+            background: var(--correct);
+        }
+
+        .key.present {
+            background: var(--present);
+        }
+
+        .key.absent {
+            background: var(--absent);
+        }
+
+        /* ---------- Mensajes ---------- */
+        #toast {
+            position: fixed;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 32px);
+            text-align: center;
+            background: var(--heading);
+            color: var(--on-state);
+            font-weight: 700;
+            padding: 10px 16px;
+            border-radius: var(--radius);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 250ms;
+            z-index: 50;
+            box-shadow: 0 6px 20px rgba(var(--shadow-rgb), 0.3);
+        }
+
+        #toast.show {
+            opacity: 1;
+        }
+
+        /* ---------- Cuadro final / Ventana emergente (Overlay) ---------- */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(var(--shadow-rgb), 0.55);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 16px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 250ms ease;
+        }
+
+        #overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            position: relative;
+            width: calc(100% - 32px);
+            max-width: 350px;
+            padding: 32px 24px 26px;
+            border: 1px solid var(--tile-border);
+            border-radius: 20px;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            color: var(--text);
+            text-align: center;
+            box-shadow: 0 16px 48px rgba(var(--shadow-rgb), 0.35);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            transform: scale(0.9);
+            transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 400ms, border-color 400ms, color 400ms;
+        }
+
+        #overlay.show .modal {
+            transform: scale(1);
+        }
+
+        /* Tachita para cerrar la mini ventana */
+        .modal-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 1px solid rgba(var(--shadow-rgb), 0.2);
+            background: rgba(var(--surface-solid, 255, 255, 255), 0.4);
+            color: var(--heading);
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: 0;
+            cursor: pointer;
+            transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .modal-close:hover {
+            transform: scale(1.15);
+            background: rgba(var(--shadow-rgb), 0.18);
+            color: var(--heading-dark);
+        }
+
+        .modal-close:active {
+            transform: scale(0.9);
+        }
+
+        .modal h2 {
+            margin: 0;
+            font-size: 1.7rem;
+            color: var(--heading);
+            font-weight: 800;
+        }
+
+        .modal p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .modal #countdown {
+            color: var(--heading);
+            font-weight: 600;
+            min-height: 1.2em;
+            font-size: 0.9rem;
+        }
+
+        .word-pill {
+            display: inline-block;
+            padding: 8px 18px;
+            border-radius: 999px;
+            font-weight: 800;
+            letter-spacing: 0.2em;
+            font-size: 1.3rem;
+            margin: 4px 0;
+        }
+
+        .word-pill.ok {
+            background: var(--correct);
+            color: var(--on-state);
+            box-shadow: 0 2px 10px rgba(var(--sky-rgb), 0.35);
+        }
+
+        .word-pill.ko {
+            background: var(--danger);
+            color: var(--danger-dark);
+            box-shadow: 0 2px 10px rgba(242, 184, 189, 0.35);
+        }
+
+        .modal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .modal button {
+            background: var(--heading);
+            color: var(--on-state);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-weight: 800;
+        }
+
+        .modal button:hover {
+            background: var(--heading-dark);
+        }
+
+        .modal button.btn-secondary {
+            background: transparent;
+            color: var(--heading);
+            border-color: var(--tile-border);
+        }
+
+        .modal button.btn-secondary:hover {
+            background: rgba(var(--lavender-rgb), 0.12);
+            border-color: var(--present);
+        }
+
+        .modal button:disabled {
+            background: var(--disabled);
+            color: var(--heading-dark);
+            border: 2px dashed var(--tile-border);
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 400px) {
+            .kb-row {
+                gap: 4px;
+            }
+
+            .key {
+                height: 50px;
+            }
+
+            .key.wide:not(.backspace) {
+                font-size: 0.65rem;
+            }
+        }
+
+        @media (max-height: 620px) {
+            .key {
+                height: 42px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 1ms !important;
+                transition-duration: 1ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="sky-canvas" aria-hidden="true"></canvas>
+
+    <header>
+        <div class="header-inner">
+            <a href="index.html" class="menu-btn" aria-label="Volver al menú" title="Volver al menú">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            </a>
+            <h1>WORDLE 2</h1>
+            <button type="button" id="sky-btn" class="sky-btn" aria-label="Cambiar modo de cielo"
+                title="Cielo dinámico (Día / Atardecer / Noche / Automático)">
+                <span id="sky-icon" aria-hidden="true">☀️</span>
+            </button>
+            <a href="corazon.html" class="heart-btn" aria-label="Una sorpresa" title="Una sorpresa 💗">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.4 2.3 4.5 6 4.5c2.2 0 3.6 1.2 4.4 2.4.5.7 1.7.7 2.2 0 .8-1.2 2.2-2.4 4.4-2.4 3.7 0 5.6 3.9 4 7.2C19.5 16.4 12 21 12 21z"/></svg>
+            </a>
+        </div>
+        <div id="plays" aria-live="polite"></div>
+        <!--<p class="subtitle">Así es, Lucia: este Wordle sí tiene más de un intento</p>-->
+    </header>
+
+    <main>
+        <div class="board" id="board" role="group" aria-label="Tablero de intentos"></div>
+    </main>
+
+    <div id="keyboard" role="group" aria-label="Teclado"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="sr-status" class="sr-only" aria-live="polite"></div>
+
+    <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-text">
+        <div class="modal">
+            <button type="button" id="modal-close" class="modal-close" aria-label="Cerrar ventana" title="Cerrar">✕</button>
+            <h2 id="result-title"></h2>
+            <p id="result-text"></p>
+            <span class="word-pill" id="result-word"></span>
+            <p id="countdown"></p>
+            <div class="modal-actions">
+                <button type="button" id="restart">Jugar de nuevo</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ================== Configuración ==================
+        const WORD_LENGTH = 5;
+        const MAX_ATTEMPTS = 6;
+        const WORD_RE = new RegExp(`^[A-ZÑ]{${WORD_LENGTH}}$`);
+        const LETTER_RE = /^[A-ZÑ]$/;
+
+        const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const FLIP_STAGGER = REDUCED_MOTION ? 0 : 250;   // retraso entre fichas
+        const FLIP_DURATION = REDUCED_MOTION ? 0 : 500;  // debe coincidir con --flip-duration
+        const RESULT_DELAY = REDUCED_MOTION ? 0 : 400;
+        document.documentElement.style.setProperty("--flip-duration", `${FLIP_DURATION}ms`);
+
+        // Límite de partidas.
+        // false = modo prueba: partidas ilimitadas, sin tiempo de espera.
+        // true  = máximo MAX_PLAYS partidas cada 24 horas.
+        const LIMIT_ENABLED = false;
+        const MAX_PLAYS = 2;
+        const WINDOW_MS = 24 * 60 * 60 * 1000;
+        const STORAGE_KEY = "wordle-latino-partidas";
+        const HISTORY_KEY = "wordle-latino-historial";
+
+        // ================== Diccionario ==================
+        // Español latinoamericano, sin tildes (excepto la Ñ). Ordenadas alfabéticamente.
+        // Palabras que pueden salir como secreta (también se aceptan como intento).
+        const SECRET_WORDS = cleanWords([
+            "ABEJA", "ABRIL", "ACTOR", "AGUJA", "ALDEA", "AMIGO", "ANCLA", "ANGEL", "ARAÑA", "ARBOL",
+            "ARENA", "AREPA", "ARETE", "ARROZ", "ASADO", "ATAJO", "AVENA", "AVION", "AYUDA", "BAILE",
+            "BALDE", "BALON", "BANCO", "BARBA", "BARCO", "BARRO", "BESOS", "BLUSA", "BOLSA", "BOLSO",
+            "BOMBA", "BORDE", "BOTAS", "BOTON", "BRAZO", "BRISA", "BROMA", "BRUJA", "BUHOS", "BURRO",
+            "BUZON", "CABLE", "CABRA", "CACAO", "CAJON", "CALDO", "CALLE", "CALOR", "CAMPO", "CANAL",
+            "CANOA", "CANTO", "CARNE", "CARPA", "CARRO", "CARTA", "CASCO", "CEBRA", "CEDRO", "CEJAS",
+            "CERDO", "CERRO", "CESTA", "CHILE", "CHIVO", "CHOZA", "CIELO", "CINCO", "CINTA", "CIRCO",
+            "CLAVE", "CLIMA", "COBRE", "COCOS", "CODOS", "COFRE", "COJIN", "COLOR", "CORAL", "CORTE",
+            "COSTA", "CREMA", "CUATE", "CUERO", "CUEVA", "DANZA", "DARDO", "DATIL", "DEDOS", "DISCO",
+            "DOLAR", "DRAMA", "DUCHA", "DULCE", "DUNAS", "ELOTE", "ENANO", "ENERO", "ERIZO", "FALDA",
+            "FAROL", "FECHA", "FERIA", "FINCA", "FLACO", "FOCAS", "FOCOS", "FRENO", "FRESA", "FRUTA",
+            "FUEGO", "GALLO", "GANSO", "GARZA", "GATOS", "GENTE", "GLOBO", "GORRA", "GORRO", "GRANO",
+            "GRUPO", "GRUTA", "GUISO", "GUSTO", "HABAS", "HACHA", "HEROE", "HIELO", "HIENA", "HIGOS",
+            "HOGAR", "HOJAS", "HONGO", "HORNO", "HOTEL", "HUESO", "HUEVO", "HUMOR", "ISLAS", "JABON",
+            "JAMON", "JARRA", "JAULA", "JOVEN", "JOYAS", "JUEGO", "JUGOS", "JULIO", "JUNIO", "KOALA",
+            "LANZA", "LAPIZ", "LECHE", "LEONA", "LIBRA", "LIBRO", "LICOR", "LIMON", "LINDO", "LIRIO",
+            "LLAMA", "LLAVE", "LOBOS", "LOROS", "LUCHA", "LUNAR", "MADRE", "MAGIA", "MALTA", "MANGO",
+            "MANOS", "MANTA", "MAPAS", "MARCO", "MAREA", "MARZO", "MATES", "MELON", "MENTA", "METRO",
+            "MIEDO", "MILLA", "MONJA", "MONOS", "MONTE", "MORAS", "MORSA", "MOSCA", "MOTOR", "MUJER",
+            "MULAS", "MUNDO", "MURAL", "MUSEO", "MUSGO", "MUSLO", "NARIZ", "NIDOS", "NIETO", "NIEVE",
+            "NOCHE", "NOPAL", "NORTE", "NOVIA", "NUBES", "NUEVE", "OLIVA", "OLIVO", "OREJA", "OSTRA",
+            "OTOÑO", "OVEJA", "PADRE", "PALMA", "PALTA", "PAMPA", "PANDA", "PAÑAL", "PAPAS", "PAPEL",
+            "PATIO", "PATOS", "PAVOS", "PECES", "PEINE", "PERAS", "PERLA", "PERRO", "PESAS", "PIANO",
+            "PINOS", "PIÑAS", "PISCO", "PIZZA", "PLATA", "PLATO", "PLAYA", "PLAZA", "PLUMA", "POEMA",
+            "POETA", "POLLO", "POTRO", "PRADO", "PRIMO", "PULPO", "PUMAS", "PUNTA", "QUESO", "RADIO",
+            "RAMAS", "RANAS", "RATON", "RAYOS", "REINA", "RELOJ", "REMOS", "RIÑON", "RISAS", "ROBLE",
+            "ROBOT", "ROCAS", "RODEO", "ROSAS", "RUBIO", "RUEDA", "SABIO", "SABOR", "SALON", "SALSA",
+            "SAMBA", "SAPOS", "SAUCE", "SELLO", "SELVA", "SIETE", "SILLA", "SOPAS", "SUEÑO", "SUSTO",
+            "TACOS", "TALLO", "TAMAL", "TANGO", "TAPIZ", "TARDE", "TECHO", "TECLA", "TELAS", "TENIS",
+            "TIGRE", "TIZAS", "TOROS", "TORRE", "TORTA", "TRAJE", "TRAPO", "TRECE", "TRIBU", "TRIGO",
+            "TUCAN", "TUNEL", "VACAS", "VAGON", "VALLE", "VASOS", "VELAS", "VERDE", "VIAJE", "VINOS",
+            "VIRUS", "VOCES", "VUELO", "YATES", "YEGUA", "YEMAS", "YUCAS", "ZANJA", "ZORRO"
+        ]);
+
+        // Palabras aceptadas solo como intento.
+        const GUESS_ONLY_WORDS = cleanWords([
+            "ABONO", "ABRIR", "ACASO", "ACERA", "ACERO", "ACIDO", "ADIOS", "ADOBE", "AGRIO", "AGUAS",
+            "AHORA", "AIRES", "AJENO", "ALAMO", "ALBUM", "ALETA", "ALGAS", "ALGUN", "ALIAS", "ALMAS",
+            "ALTAR", "ALTOS", "ALZAR", "AMADO", "AMBAR", "AMBOS", "AMIGA", "ANCHO", "ANDAR", "ANEXO",
+            "ANIMO", "ANTES", "ANTRO", "AÑEJO", "APODO", "APOYO", "ARCOS", "ARDER", "ARDOR", "ARMAR",
+            "ARMAS", "AROMA", "ARPON", "ASILO", "ASTRO", "ATLAS", "ATRAS", "ATROZ", "AULAS", "AUTOS",
+            "AVISO", "BAHIA", "BAJAR", "BAJOS", "BALAS", "BALSA", "BANDA", "BAÑAR", "BAÑOS", "BARES",
+            "BARRA", "BASES", "BASTA", "BATAS", "BEBER", "BEBES", "BECAS", "BELLO", "BESAR", "BICHO",
+            "BOCAS", "BODAS", "BOLAS", "BOTES", "BRAVO", "BUENO", "BUFON", "BURLA", "BUSCA", "BUSTO",
+            "CABOS", "CAFES", "CAIDA", "CAJAS", "CALMA", "CALVO", "CAMAS", "CANAS", "CAÑON", "CAPAZ",
+            "CARAS", "CARGA", "CASAS", "CAUSA", "CAZAR", "CELDA", "CELOS", "CENAR", "CERCA", "CERCO",
+            "CHAMO", "CHAVO", "CHELA", "CHICA", "CHICO", "CICLO", "CIEGO", "CIFRA", "CITAS", "CLARO",
+            "CLASE", "CLAVO", "COCER", "COLAS", "COLMO", "COMER", "COMUN", "CONOS", "COPAS", "COPIA",
+            "CORTO", "COSAS", "COSER", "CREER", "CRUCE", "CRUDO", "CULPA", "CULTO", "CUOTA", "CURAR",
+            "CURVA", "DADOS", "DAMAS", "DATOS", "DEBER", "DEBIL", "DECIR", "DEJAR", "DENSO", "DESDE",
+            "DICHA", "DIETA", "DIGNO", "DIOSA", "DOBLE", "DOLOR", "DONDE", "DORSO", "DOSIS", "DUDAS",
+            "DUELO", "DUEÑO", "DURAR", "ENOJO", "ENTRE", "ENVIO", "EPOCA", "ERROR", "ESPIA", "ESTAR",
+            "ETAPA", "ETICA", "EXITO", "EXTRA", "FALLA", "FALSO", "FALTA", "FARSA", "FATAL", "FAVOR",
+            "FELIZ", "FEROZ", "FIBRA", "FICHA", "FIERA", "FIJAR", "FILAS", "FINAL", "FIRMA", "FLOJO",
+            "FLORA", "FLOTA", "FLUJO", "FOBIA", "FONDO", "FORMA", "FOTOS", "FRASE", "FRIOS", "FUERA",
+            "FUGAZ", "FUMAR", "FUNDA", "FUSIL", "GALAN", "GANAR", "GANAS", "GARRA", "GASES", "GASTO",
+            "GEMAS", "GENIO", "GIRAR", "GIROS", "GOLES", "GOLPE", "GOMAS", "GORDO", "GOTAS", "GOZAR",
+            "GRADO", "GRAMO", "GRASA", "GRAVE", "GRITO", "GUAPO", "GUIAR", "GUIAS", "GUION", "HABER",
+            "HABIL", "HACER", "HACIA", "HARTO", "HEBRA", "HECHO", "HELAR", "HIJOS", "HILOS", "HIMNO",
+            "HONDO", "HONOR", "HORAS", "HUECO", "HUMOS", "HURTO", "IDEAL", "IDEAS", "IDOLO", "IGUAL",
+            "IMPAR", "JALAR", "JAMAS", "JEFES", "JERGA", "JUGAR", "JUNTA", "JUNTO", "JURAR", "JUSTO",
+            "LABIO", "LABOR", "LACIO", "LADOS", "LAGOS", "LANAS", "LAPSO", "LARGO", "LATAS", "LAVAR",
+            "LAZOS", "LEGAL", "LEGUA", "LEJOS", "LEMAS", "LENTE", "LENTO", "LETRA", "LIBRE", "LIDER",
+            "LIGAR", "LINDA", "LINEA", "LISTA", "LISTO", "LLAGA", "LLANO", "LLENO", "LOCAL", "LOCOS",
+            "LOGRO", "LOMAS", "LOTES", "LUCES", "LUGAR", "LUJOS", "LUNES", "MACHO", "MAGOS", "MALLA",
+            "MALOS", "MAMAS", "MAMBO", "MANDO", "MANIA", "MARCA", "MARES", "MASAS", "MATAR", "MAYOR",
+            "MECER", "MEDIA", "MEDIO", "MEDIR", "MEJOR", "MENOR", "MENOS", "MENTE", "MESAS", "METAL",
+            "MICRO", "MIMOS", "MINAS", "MIRAR", "MISAS", "MISMO", "MITAD", "MIXTO", "MOCOS", "MODAS",
+            "MOLDE", "MOLER", "MORAL", "MORIR", "MOTEL", "MOVER", "MUCHO", "MUDAR", "MUDOS", "MUELA",
+            "MULTA", "MUROS", "MUTUO", "NABOS", "NACER", "NADAR", "NADIE", "NAFTA", "NAIPE", "NALGA",
+            "NAVES", "NECIO", "NEGAR", "NEGRO", "NIETA", "NINFA", "NIÑAS", "NIÑOS", "NIVEL", "NOBLE",
+            "NORMA", "NOTAS", "NOVIO", "NUDOS", "NUERA", "NUEVO", "NUNCA", "OBESO", "OBRAS", "OBVIO",
+            "OCASO", "ODIAR", "OESTE", "OJALA", "OLLAS", "ONDAS", "OPACO", "OPERA", "ORDEN", "OSADO",
+            "OSITO", "OVALO", "PACTO", "PAGAR", "PAGOS", "PALCO", "PALOS", "PANAL", "PANEL", "PANZA",
+            "PAÑOS", "PARAR", "PARED", "PARTE", "PASAR", "PASEO", "PASOS", "PASTA", "PASTO", "PATAS",
+            "PATIN", "PAUSA", "PECAR", "PECHO", "PEDAL", "PEDIR", "PEGAR", "PELAR", "PELEA", "PELOS",
+            "PENAS", "PEÑAS", "PESAR", "PESCA", "PESOS", "PIBES", "PICAR", "PICOS", "PIEZA", "PILAS",
+            "PINTA", "PINZA", "PIPAS", "PISAR", "PISOS", "PISTA", "PLACA", "PLAGA", "PLANO", "PLAZO",
+            "PLENO", "PLOMO", "POBRE", "POCOS", "PODER", "POLAR", "POLEA", "POLOS", "POLVO", "POMPA",
+            "PONER", "POROS", "POSTE", "POZOS", "PRESA", "PRESO", "PRIMA", "PRISA", "PROSA", "PUNTO",
+            "PUÑAL", "PUROS", "QUEJA", "QUIEN", "RABIA", "RACHA", "RADAR", "RAROS", "RASGO", "RATAS",
+            "RAYAS", "RAZON", "RECTO", "REDES", "REGAR", "REGLA", "REINO", "REMAR", "RENTA", "RESTO",
+            "REYES", "REZAR", "RICOS", "RIEGO", "RIFAS", "RIFLE", "RIGOR", "RIMAS", "RITMO", "ROBAR",
+            "RODAR", "ROJOS", "ROLLO", "RONCO", "ROPAS", "ROSCA", "RUGIR", "RUIDO", "RUINA", "RUMBO",
+            "RUMOR", "RUTAS", "SABER", "SABLE", "SACAR", "SACOS", "SALAS", "SALIR", "SALTO", "SALUD",
+            "SALVO", "SANAR", "SANTO", "SECAR", "SECTA", "SEDAS", "SEGUN", "SENDA", "SEÑAL", "SEÑAS",
+            "SEÑOR", "SERES", "SERIE", "SERIO", "SIGLO", "SIGNO", "SITIO", "SOBRA", "SOBRE", "SOCIO",
+            "SOFAS", "SOGAS", "SOLAR", "SOLOS", "SONAR", "SONDA", "SOÑAR", "SORDO", "SUAVE", "SUBIR",
+            "SUCIO", "SUDAR", "SUDOR", "SUELO", "SUMAR", "SURCO", "TABLA", "TACTO", "TALLA", "TANTO",
+            "TAPAS", "TAPON", "TAREA", "TARRO", "TAXIS", "TAZAS", "TEJER", "TEMAS", "TEMOR", "TENAZ",
+            "TENER", "TERCO", "TEXTO", "TIBIO", "TILDE", "TIMON", "TINTA", "TIRAR", "TOCAR", "TOMAR",
+            "TONOS", "TONTO", "TOPOS", "TORPE", "TOSER", "TOTAL", "TRAER", "TRAGO", "TRAMA", "TRAMO",
+            "TRATO", "TROPA", "TROZO", "TRUCO", "TUBOS", "TUMBA", "TURNO", "UNICO", "UNIDO", "UNION",
+            "UNTAR", "USADO", "USUAL", "VACIO", "VAGOS", "VAINA", "VALLA", "VALOR", "VAPOR", "VECES",
+            "VEJEZ", "VELOZ", "VENAS", "VENDA", "VENIR", "VENTA", "VERBO", "VERSO", "VIDAS", "VIEJO",
+            "VIGOR", "VILLA", "VISTA", "VIUDA", "VIVIR", "VIVOS", "VOCAL", "VOLAR", "VOTAR", "YERBA",
+            "YERNO", "ZONAS", "ZURDA", "ZURDO"
+        ]);
+
+        const SECRET_SET = new Set(SECRET_WORDS);
+        const VALID_WORDS = new Set([...SECRET_WORDS, ...GUESS_ONLY_WORDS]);
+
+        // Cuántas palabras recientes se recuerdan para no repetirlas
+        const HISTORY_SIZE = Math.max(1, Math.min(100, SECRET_WORDS.length - 1));
+
+        const KEY_ROWS = [
+            ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+            ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
+            ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BORRAR"]
+        ];
+        const SPECIAL_KEYS = {
+            ENTER: { text: "ENVIAR", label: "Enviar palabra", className: "wide enter" },
+            BORRAR: { text: "⌫", label: "Borrar letra", className: "wide backspace" }
+        };
+        const STATE_RANK = { absent: 1, present: 2, correct: 3 };
+        const STATE_LABEL = { absent: "no está", present: "en otra posición", correct: "correcta" };
+        const STATE_CLASSES = Object.keys(STATE_RANK);
+
+        // Convierte vocales con tilde o diéresis a su forma simple (la Ñ se conserva)
+        const ACCENTS = { "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ü": "U" };
+
+        // Deduplica y descarta (avisando) cualquier palabra mal escrita en las listas
+        function cleanWords(list) {
+            const words = new Set();
+            for (const w of list) {
+                if (WORD_RE.test(w)) words.add(w);
+                else console.warn(`Palabra ignorada (formato inválido): "${w}"`);
+            }
+            return [...words];
+        }
+
+        // ================== Elementos ==================
+        const $ = id => document.getElementById(id);
+        const boardEl = $("board");
+        const keyboardEl = $("keyboard");
+        const toastEl = $("toast");
+        const srStatusEl = $("sr-status");
+        const playsEl = $("plays");
+        const overlayEl = $("overlay");
+        const modalCloseBtn = $("modal-close");
+        const titleEl = $("result-title");
+        const textEl = $("result-text");
+        const pillEl = $("result-word");
+        const countdownEl = $("countdown");
+        const restartBtn = $("restart");
+        const skyCanvas = $("sky-canvas");
+        const skyBtn = $("sky-btn");
+        const skyIcon = $("sky-icon");
+        const metaThemeEl = $("meta-theme");
+
+        // ================== Estado ==================
+        const state = {
+            secret: "",
+            row: 0,
+            guess: "",
+            over: false,
+            busy: false,
+            started: false,
+            keyStates: new Map()
+        };
+        let rowEls = [];
+        let tiles = [];
+        const keyEls = new Map();
+        let countdownTimer;
+        let toastTimer;
+
+        // ================== Almacenamiento ==================
+        // localStorage con respaldo en memoria (modo privado, cookies bloqueadas, etc.)
+        const memory = new Map();
+        const storage = {
+            get(key) {
+                try {
+                    const raw = localStorage.getItem(key);
+                    if (raw !== null) return JSON.parse(raw);
+                } catch { /* sin acceso o JSON corrupto: se usa la memoria */ }
+                return memory.get(key) ?? null;
+            },
+            set(key, value) {
+                memory.set(key, value);
+                try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* sin almacenamiento */ }
+            },
+            remove(key) {
+                memory.delete(key);
+                try { localStorage.removeItem(key); } catch { /* sin almacenamiento */ }
+            }
+        };
+
+        // ================== Límite de partidas (24 h) ==================
+        // Se guarda: cada partida jugada ({ t: hora de inicio, w: palabra }) y la partida en curso.
+        function loadStore() {
+            const raw = storage.get(STORAGE_KEY);
+            const now = Date.now();
+            const plays = Array.isArray(raw?.plays)
+                ? raw.plays.filter(p => typeof p?.t === "number" && p.t <= now && now - p.t < WINDOW_MS)
+                : [];
+            const cur = raw?.current;
+            const current = SECRET_SET.has(cur?.secret) && Array.isArray(cur.guesses)
+                ? {
+                    secret: cur.secret,
+                    guesses: cur.guesses.filter(g => VALID_WORDS.has(g)).slice(0, MAX_ATTEMPTS)
+                }
+                : null;
+            return { plays, current };
+        }
+
+        const saveStore = store => storage.set(STORAGE_KEY, store);
+
+        const playsLeft = (store = loadStore()) =>
+            LIMIT_ENABLED ? Math.max(0, MAX_PLAYS - store.plays.length) : Infinity;
+
+        // ================== Elección aleatoria de la palabra ==================
+        const randomInt = n => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+
+        // Elige una palabra al azar que no haya salido recientemente
+        function pickSecret() {
+            const stored = storage.get(HISTORY_KEY);
+            const recent = Array.isArray(stored) ? stored.filter(w => SECRET_SET.has(w)) : [];
+            const used = new Set(recent);
+            if (LIMIT_ENABLED) loadStore().plays.forEach(({ w }) => used.add(w));
+
+            let pool = SECRET_WORDS.filter(w => !used.has(w));
+            if (!pool.length) pool = SECRET_WORDS.filter(w => w !== recent.at(-1));
+            if (!pool.length) pool = SECRET_WORDS; // diccionario de una sola palabra
+
+            const word = pool[randomInt(pool.length)];
+            storage.set(HISTORY_KEY, [...recent, word].slice(-HISTORY_SIZE));
+            return word;
+        }
+
+        // ================== Utilidades ==================
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        function formatTime(ms) {
+            const total = Math.max(0, Math.ceil(ms / 1000));
+            return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
+                .map(n => String(n).padStart(2, "0"))
+                .join(":");
+        }
+
+        function showToast(msg, ms = 1500) {
+            toastEl.textContent = msg;
+            toastEl.classList.add("show");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.remove("show"), ms);
+        }
+
+        const announce = msg => { srStatusEl.textContent = msg; };
+
+        // Evalúa la palabra gestionando correctamente las letras repetidas
+        function evaluate(guess, target) {
+            const result = Array(WORD_LENGTH).fill("absent");
+            const remaining = new Map();
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                if (guess[i] === target[i]) result[i] = "correct";
+                else remaining.set(target[i], (remaining.get(target[i]) ?? 0) + 1);
+            }
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                const count = remaining.get(guess[i]);
+                if (result[i] !== "correct" && count > 0) {
+                    result[i] = "present";
+                    remaining.set(guess[i], count - 1);
+                }
+            }
+            return result;
+        }
+
+        // ================== Interfaz ==================
+        // El tablero y el teclado se crean una sola vez; entre partidas solo se limpian.
+        function buildBoard() {
+            rowEls = Array.from({ length: MAX_ATTEMPTS }, () => {
+                const row = document.createElement("div");
+                row.className = "row";
+                return row;
+            });
+            tiles = rowEls.map(row => Array.from({ length: WORD_LENGTH }, () => {
+                const t = document.createElement("div");
+                t.className = "tile";
+                row.append(t);
+                return t;
+            }));
+            boardEl.replaceChildren(...rowEls);
+        }
+
+        function buildKeyboard() {
+            const rows = KEY_ROWS.map(keys => {
+                const rowDiv = document.createElement("div");
+                rowDiv.className = "kb-row";
+                for (const k of keys) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.dataset.key = k;
+                    const special = SPECIAL_KEYS[k];
+                    if (special) {
+                        btn.className = `key ${special.className}`;
+                        btn.textContent = special.text;
+                        btn.setAttribute("aria-label", special.label);
+                    } else {
+                        btn.className = "key";
+                        btn.textContent = k;
+                        keyEls.set(k, btn);
+                    }
+                    rowDiv.append(btn);
+                }
+                return rowDiv;
+            });
+
+            keyboardEl.replaceChildren(...rows);
+        }
+
+        function clearUI() {
+            for (const row of tiles) {
+                for (const t of row) {
+                    t.textContent = "";
+                    t.className = "tile";
+                    t.removeAttribute("aria-label");
+                }
+            }
+            for (const btn of keyEls.values()) {
+                btn.classList.remove(...STATE_CLASSES);
+                btn.removeAttribute("aria-label");
+            }
+        }
+
+        function updatePlaysInfo(store) {
+            if (!LIMIT_ENABLED) {
+                playsEl.textContent = "Bienvenida Lucy (✿◡‿◡) este wordle si es ilimitado  jaja ✿";
+                return;
+            }
+            const left = playsLeft(store);
+            const dots = Array.from({ length: MAX_PLAYS }, (_, i) => {
+                const dot = document.createElement("span");
+                dot.className = i < left ? "dot on" : "dot";
+                dot.setAttribute("aria-hidden", "true");
+                return dot;
+            });
+            const label = document.createElement("span");
+            label.textContent = left === 1 ? "1 partida disponible" : `${left} partidas disponibles`;
+            playsEl.replaceChildren(...dots, label);
+        }
+
+        function setRestartEnabled(enabled) {
+            restartBtn.disabled = !enabled;
+            restartBtn.textContent = enabled ? "Jugar de nuevo" : "Vuelve más tarde";
+        }
+
+        // Actualiza el botón del cuadro final: habilitado o con cuenta regresiva
+        function refreshOverlayButton() {
+            clearInterval(countdownTimer);
+            if (!LIMIT_ENABLED) {
+                countdownEl.textContent = "La próxima partida tendrá otra palabra.";
+                setRestartEnabled(true);
+                return;
+            }
+            const store = loadStore();
+            const left = playsLeft(store);
+            if (left > 0) {
+                countdownEl.textContent = left === 1
+                    ? "Te queda 1 partida disponible, con otra palabra."
+                    : `Te quedan ${left} partidas disponibles.`;
+                setRestartEnabled(true);
+                updatePlaysInfo(store);
+                return;
+            }
+            setRestartEnabled(false);
+            const unlockAt = Math.min(...store.plays.map(p => p.t)) + WINDOW_MS;
+            const tick = () => {
+                const ms = unlockAt - Date.now();
+                if (ms <= 0) refreshOverlayButton();
+                else countdownEl.textContent = `Próxima partida en ${formatTime(ms)}`;
+            };
+            tick();
+            countdownTimer = setInterval(tick, 1000);
+        }
+
+        function openOverlay() {
+            refreshOverlayButton();
+            overlayEl.classList.add("show");
+        }
+
+        function closeOverlay() {
+            overlayEl.classList.remove("show");
+            clearInterval(countdownTimer);
+        }
+
+        function showResult({ title, text, word = null, won = false }) {
+            titleEl.textContent = title;
+            textEl.textContent = text;
+            if (word) {
+                pillEl.textContent = word;
+                pillEl.className = `word-pill ${won ? "ok" : "ko"}`;
+                pillEl.style.display = "";
+            } else {
+                pillEl.style.display = "none";
+            }
+        }
+
+        function showLimit() {
+            state.over = true;
+            showResult({
+                title: "⏳ Límite alcanzado",
+                text: `Ya jugaste tus ${MAX_PLAYS} partidas de las últimas 24 horas.`,
+                word: null
+            });
+            openOverlay();
+        }
+
+        // ================== Juego ==================
+        function resetGame(secret) {
+            Object.assign(state, { secret, row: 0, guess: "", over: false, busy: false, started: false });
+            state.keyStates.clear();
+            clearUI();
+        }
+
+        function newGame() {
+            if (playsLeft() <= 0) {
+                showLimit();
+                return;
+            }
+            closeOverlay();
+            resetGame(pickSecret());
+            updatePlaysInfo();
+        }
+
+        function applyTileState(t, letter, status) {
+            t.classList.add(status);
+            t.setAttribute("aria-label", `${letter}, ${STATE_LABEL[status]}`);
+        }
+
+        // Pinta una fila sin animación (al retomar una partida guardada)
+        function paintRow(row, guess, result) {
+            result.forEach((status, c) => {
+                const t = tiles[row][c];
+                t.textContent = guess[c];
+                applyTileState(t, guess[c], status);
+            });
+        }
+
+        // ================== Cielo Dinámico con Ciclo Día/Noche y Nubes ==================
+        const SKY_STORAGE_KEY = "wordle-cielo-modo";
+
+        class DynamicSky {
+            constructor(canvas, skyBtnEl, skyIconEl, metaThemeEl) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext("2d");
+                this.btn = skyBtnEl;
+                this.icon = skyIconEl;
+                this.metaTheme = metaThemeEl;
+
+                this.mode = storage.get(SKY_STORAGE_KEY) || "auto"; // 'auto' | 'day' | 'sunset' | 'night'
+                this.activePhase = "day"; // 'morning' | 'day' | 'sunset' | 'night'
+
+                this.isMobile = (window.innerWidth < 768) || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                this.targetFps = this.isMobile ? 36 : 60;
+                this.frameInterval = 1000 / this.targetFps;
+                this.lastRender = 0;
+
+                this.width = 0;
+                this.height = 0;
+                this.dpr = 1;
+
+                this.clouds = [];
+                this.stars = [];
+                this.animId = null;
+                this.lastTime = performance.now();
+
+                this.reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+                // Valores actuales para interpolación suave (lerp)
+                this.current = {
+                    top: [74, 144, 217],
+                    mid: [148, 198, 243],
+                    bot: [225, 242, 255],
+                    sunX: 0.78,
+                    sunY: 0.22,
+                    sunAlpha: 1,
+                    sunR: 28,
+                    sunColor: [255, 250, 220],
+                    sunGlow: [255, 215, 120, 0.4],
+                    moonX: 0.8,
+                    moonY: 0.2,
+                    moonAlpha: 0,
+                    starAlpha: 0,
+                    cloudTop: [255, 255, 255, 0.95],
+                    cloudMid: [240, 246, 255, 0.85],
+                    cloudBot: [180, 200, 225, 0.42]
+                };
+
+                this.target = { ...this.current };
+
+                this.initStars();
+                this.resize();
+                this.initClouds();
+
+                window.addEventListener("resize", () => {
+                    this.resize();
+                    this.repositionClouds();
+                }, { passive: true });
+
+                document.addEventListener("visibilitychange", () => {
+                    if (document.hidden) {
+                        if (this.animId) cancelAnimationFrame(this.animId);
+                        this.animId = null;
+                    } else {
+                        this.lastTime = performance.now();
+                        this.loop(this.lastTime);
+                    }
+                });
+
+                if (this.btn) {
+                    this.btn.addEventListener("click", () => this.cycleMode());
+                }
+
+                this.syncPhase(true);
+                this.updateButtonUI();
+                this.loop(performance.now());
+            }
+
+            getAutoPhase() {
+                const now = new Date();
+                const h = now.getHours() + now.getMinutes() / 60;
+                if (h >= 6 && h < 11.5) return "morning";
+                if (h >= 11.5 && h < 18) return "day";
+                if (h >= 18 && h < 20.75) return "sunset";
+                return "night";
+            }
+
+            getThemeForPhase(phase) {
+                if (phase === "night") return "night";
+                if (phase === "sunset") return "sunset";
+                return "day";
+            }
+
+            syncPhase(immediate = false) {
+                const phase = this.mode === "auto" ? this.getAutoPhase() : this.mode;
+                this.activePhase = phase;
+                const theme = this.getThemeForPhase(phase);
+
+                if (theme === "day") {
+                    document.documentElement.removeAttribute("data-theme");
+                } else {
+                    document.documentElement.setAttribute("data-theme", theme);
+                }
+
+                let themeColor = "#6b95c0";
+                if (phase === "day") {
+                    themeColor = "#74aee2";
+                    this.target = {
+                        top: [74, 144, 217],
+                        mid: [148, 198, 243],
+                        bot: [225, 242, 255],
+                        sunX: 0.78,
+                        sunY: 0.22,
+                        sunAlpha: 1,
+                        sunR: 28,
+                        sunColor: [255, 250, 220],
+                        sunGlow: [255, 215, 120, 0.4],
+                        moonX: 0.8,
+                        moonY: 0.2,
+                        moonAlpha: 0,
+                        starAlpha: 0,
+                        cloudTop: [255, 255, 255, 0.96],
+                        cloudMid: [240, 246, 255, 0.86],
+                        cloudBot: [180, 200, 225, 0.42]
+                    };
+                } else if (phase === "morning") {
+                    themeColor = "#7ba0c8";
+                    this.target = {
+                        top: [95, 135, 195],
+                        mid: [175, 175, 225],
+                        bot: [255, 215, 185],
+                        sunX: 0.24,
+                        sunY: 0.42,
+                        sunAlpha: 1,
+                        sunR: 26,
+                        sunColor: [255, 235, 190],
+                        sunGlow: [255, 190, 100, 0.45],
+                        moonX: 0.8,
+                        moonY: 0.2,
+                        moonAlpha: 0,
+                        starAlpha: 0,
+                        cloudTop: [255, 250, 240, 0.94],
+                        cloudMid: [245, 228, 232, 0.82],
+                        cloudBot: [185, 170, 205, 0.45]
+                    };
+                } else if (phase === "sunset") {
+                    themeColor = "#54285b";
+                    this.target = {
+                        top: [58, 30, 80],
+                        mid: [175, 72, 105],
+                        bot: [245, 155, 90],
+                        sunX: 0.65,
+                        sunY: 0.58,
+                        sunAlpha: 1,
+                        sunR: 30,
+                        sunColor: [255, 170, 90],
+                        sunGlow: [235, 95, 75, 0.5],
+                        moonX: 0.8,
+                        moonY: 0.2,
+                        moonAlpha: 0,
+                        starAlpha: 0.2,
+                        cloudTop: [255, 205, 160, 0.9],
+                        cloudMid: [210, 125, 145, 0.8],
+                        cloudBot: [85, 40, 80, 0.55]
+                    };
+                } else { // night
+                    themeColor = "#0d152a";
+                    this.target = {
+                        top: [7, 12, 28],
+                        mid: [15, 26, 54],
+                        bot: [26, 40, 78],
+                        sunX: 0.78,
+                        sunY: 0.22,
+                        sunAlpha: 0,
+                        sunR: 26,
+                        sunColor: [255, 250, 220],
+                        sunGlow: [255, 215, 120, 0],
+                        moonX: 0.8,
+                        moonY: 0.2,
+                        moonAlpha: 1,
+                        starAlpha: 1,
+                        cloudTop: [145, 175, 215, 0.4],
+                        cloudMid: [35, 48, 75, 0.65],
+                        cloudBot: [16, 24, 42, 0.72]
+                    };
+                }
+
+                if (this.metaTheme) this.metaTheme.setAttribute("content", themeColor);
+
+                if (immediate) {
+                    for (const k in this.target) {
+                        this.current[k] = Array.isArray(this.target[k]) ? [...this.target[k]] : this.target[k];
+                    }
+                }
+            }
+
+            cycleMode() {
+                const modes = ["auto", "day", "sunset", "night"];
+                const nextIdx = (modes.indexOf(this.mode) + 1) % modes.length;
+                this.mode = modes[nextIdx];
+                storage.set(SKY_STORAGE_KEY, this.mode);
+                this.syncPhase(false);
+                this.updateButtonUI();
+
+                const msgs = {
+                    auto: "Cielo: Automático (tiempo real) ⏱️",
+                    day: "Cielo: Día ☀️",
+                    sunset: "Cielo: Atardecer 🌅",
+                    night: "Cielo: Noche 🌙"
+                };
+                showToast(msgs[this.mode]);
+            }
+
+            updateButtonUI() {
+                if (!this.icon) return;
+                const icons = {
+                    auto: "⛅",
+                    day: "☀️",
+                    sunset: "🌅",
+                    night: "🌙"
+                };
+                const titles = {
+                    auto: "Cielo: Automático en tiempo real (clic para cambiar)",
+                    day: "Cielo: Día (clic para cambiar)",
+                    sunset: "Cielo: Atardecer (clic para cambiar)",
+                    night: "Cielo: Noche (clic para cambiar)"
+                };
+                this.icon.textContent = icons[this.mode] || "⛅";
+                if (this.btn) this.btn.title = titles[this.mode] || "Cambiar modo de cielo";
+            }
+
+            initStars() {
+                this.stars = [];
+                const count = this.isMobile ? 32 : 65;
+                for (let i = 0; i < count; i++) {
+                    const tintChoice = Math.random();
+                    let color = "255, 255, 255";
+                    if (tintChoice < 0.25) color = "200, 225, 255";
+                    else if (tintChoice < 0.45) color = "255, 245, 215";
+
+                    this.stars.push({
+                        xNorm: Math.random(),
+                        yNorm: Math.random() * 0.72,
+                        r: Math.random() * 1.4 + 0.6,
+                        baseAlpha: Math.random() * 0.65 + 0.25,
+                        speed: Math.random() * 0.0025 + 0.0012,
+                        phase: Math.random() * Math.PI * 2,
+                        color
+                    });
+                }
+            }
+
+            initClouds() {
+                this.clouds = [];
+                const layerDefs = this.isMobile ? [
+                    { count: 2, scaleRange: [0.65, 0.85], speedRange: [0.12, 0.22], yRange: [0.06, 0.4] },
+                    { count: 3, scaleRange: [0.95, 1.25], speedRange: [0.28, 0.45], yRange: [0.15, 0.68] },
+                    { count: 2, scaleRange: [1.35, 1.6], speedRange: [0.55, 0.85], yRange: [0.28, 0.82] }
+                ] : [
+                    { count: 3, scaleRange: [0.65, 0.85], speedRange: [0.12, 0.22], yRange: [0.06, 0.45] },
+                    { count: 4, scaleRange: [0.95, 1.25], speedRange: [0.28, 0.45], yRange: [0.12, 0.72] },
+                    { count: 3, scaleRange: [1.35, 1.7], speedRange: [0.55, 0.85], yRange: [0.25, 0.85] }
+                ];
+
+                layerDefs.forEach((l, lIdx) => {
+                    for (let i = 0; i < l.count; i++) {
+                        const scale = l.scaleRange[0] + Math.random() * (l.scaleRange[1] - l.scaleRange[0]);
+                        const speed = l.speedRange[0] + Math.random() * (l.speedRange[1] - l.speedRange[0]);
+                        const baseW = 180 + Math.random() * 80;
+                        const baseH = 75 + Math.random() * 30;
+
+                        const puffs = [
+                            { dx: -baseW * 0.38, dy: baseH * 0.08, r: baseH * 0.4 },
+                            { dx: -baseW * 0.18, dy: -baseH * 0.18, r: baseH * 0.52 },
+                            { dx: baseW * 0.05, dy: -baseH * 0.25, r: baseH * 0.58 },
+                            { dx: baseW * 0.25, dy: -baseH * 0.12, r: baseH * 0.46 },
+                            { dx: baseW * 0.4, dy: baseH * 0.1, r: baseH * 0.38 },
+                            { dx: 0, dy: baseH * 0.12, r: baseH * 0.44 },
+                            { dx: -baseW * 0.08, dy: baseH * 0.05, r: baseH * 0.48 }
+                        ];
+
+                        const totalW = (baseW + baseH * 1.2) * scale;
+                        const x = Math.random() * (this.width + totalW) - totalW * 0.5;
+                        const y = (l.yRange[0] + Math.random() * (l.yRange[1] - l.yRange[0])) * this.height;
+
+                        this.clouds.push({
+                            layer: lIdx,
+                            x,
+                            y,
+                            scale,
+                            speed: this.reducedMotion ? 0.03 : speed,
+                            baseW,
+                            baseH,
+                            totalW,
+                            puffs,
+                            yRange: l.yRange
+                        });
+                    }
+                });
+
+                this.clouds.sort((a, b) => a.layer - b.layer);
+            }
+
+            repositionClouds() {
+                for (const c of this.clouds) {
+                    c.totalW = (c.baseW + c.baseH * 1.2) * c.scale;
+                    if (c.y > this.height) {
+                        c.y = (c.yRange[0] + Math.random() * (c.yRange[1] - c.yRange[0])) * this.height;
+                    }
+                }
+            }
+
+            resize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.isMobile = (this.width < 768) || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                this.targetFps = this.isMobile ? 36 : 60;
+                this.frameInterval = 1000 / this.targetFps;
+                const maxDpr = this.isMobile ? 1.25 : 1.75;
+                this.dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+                this.canvas.width = Math.floor(this.width * this.dpr);
+                this.canvas.height = Math.floor(this.height * this.dpr);
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.scale(this.dpr, this.dpr);
+            }
+
+            lerp(a, b, t) {
+                return a + (b - a) * t;
+            }
+
+            lerpArr(a, b, t) {
+                return a.map((val, i) => this.lerp(val, b[i], t));
+            }
+
+            updateInterpolation(dt) {
+                const t = Math.min(1, dt * 0.0035);
+                this.current.top = this.lerpArr(this.current.top, this.target.top, t);
+                this.current.mid = this.lerpArr(this.current.mid, this.target.mid, t);
+                this.current.bot = this.lerpArr(this.current.bot, this.target.bot, t);
+
+                this.current.cloudTop = this.lerpArr(this.current.cloudTop, this.target.cloudTop, t);
+                this.current.cloudMid = this.lerpArr(this.current.cloudMid, this.target.cloudMid, t);
+                this.current.cloudBot = this.lerpArr(this.current.cloudBot, this.target.cloudBot, t);
+
+                this.current.sunX = this.lerp(this.current.sunX, this.target.sunX, t);
+                this.current.sunY = this.lerp(this.current.sunY, this.target.sunY, t);
+                this.current.sunAlpha = this.lerp(this.current.sunAlpha, this.target.sunAlpha, t);
+                this.current.sunR = this.lerp(this.current.sunR, this.target.sunR, t);
+                this.current.sunColor = this.lerpArr(this.current.sunColor, this.target.sunColor, t);
+                this.current.sunGlow = this.lerpArr(this.current.sunGlow, this.target.sunGlow, t);
+
+                this.current.moonX = this.lerp(this.current.moonX, this.target.moonX, t);
+                this.current.moonY = this.lerp(this.current.moonY, this.target.moonY, t);
+                this.current.moonAlpha = this.lerp(this.current.moonAlpha, this.target.moonAlpha, t);
+                this.current.starAlpha = this.lerp(this.current.starAlpha, this.target.starAlpha, t);
+            }
+
+            drawSkyGradient() {
+                const { top, mid, bot } = this.current;
+                const grad = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                grad.addColorStop(0, `rgb(${top[0] | 0}, ${top[1] | 0}, ${top[2] | 0})`);
+                grad.addColorStop(0.55, `rgb(${mid[0] | 0}, ${mid[1] | 0}, ${mid[2] | 0})`);
+                grad.addColorStop(1, `rgb(${bot[0] | 0}, ${bot[1] | 0}, ${bot[2] | 0})`);
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+            }
+
+            drawStars(time) {
+                if (this.current.starAlpha <= 0.01) return;
+                this.ctx.save();
+                for (const s of this.stars) {
+                    const x = s.xNorm * this.width;
+                    const y = s.yNorm * this.height;
+                    const twinkle = Math.sin(time * s.speed + s.phase);
+                    const a = Math.max(0, Math.min(1, (s.baseAlpha + twinkle * 0.35) * this.current.starAlpha));
+                    this.ctx.fillStyle = `rgba(${s.color}, ${a})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, s.r, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                this.ctx.restore();
+            }
+
+            drawSun() {
+                const alpha = this.current.sunAlpha;
+                if (alpha <= 0.01) return;
+                const x = this.current.sunX * this.width;
+                const y = this.current.sunY * this.height;
+                const r = this.current.sunR;
+                const color = this.current.sunColor;
+                const glow = this.current.sunGlow;
+
+                this.ctx.save();
+                this.ctx.globalAlpha = alpha;
+
+                const corona = this.ctx.createRadialGradient(x, y, r * 0.3, x, y, r * 3.8);
+                corona.addColorStop(0, `rgba(${glow[0] | 0}, ${glow[1] | 0}, ${glow[2] | 0}, ${glow[3]})`);
+                corona.addColorStop(0.65, `rgba(${glow[0] | 0}, ${glow[1] | 0}, ${glow[2] | 0}, ${glow[3] * 0.3})`);
+                corona.addColorStop(1, `rgba(${glow[0] | 0}, ${glow[1] | 0}, ${glow[2] | 0}, 0)`);
+                this.ctx.fillStyle = corona;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, r * 3.8, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                const core = this.ctx.createRadialGradient(x, y, 0, x, y, r);
+                core.addColorStop(0, "#ffffff");
+                core.addColorStop(0.7, `rgb(${color[0] | 0}, ${color[1] | 0}, ${color[2] | 0})`);
+                core.addColorStop(1, `rgba(${glow[0] | 0}, ${glow[1] | 0}, ${glow[2] | 0}, 0.8)`);
+                this.ctx.fillStyle = core;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, r, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.restore();
+            }
+
+            drawMoon() {
+                const alpha = this.current.moonAlpha;
+                if (alpha <= 0.01) return;
+                const x = this.current.moonX * this.width;
+                const y = this.current.moonY * this.height;
+                const r = 24;
+
+                this.ctx.save();
+                this.ctx.globalAlpha = alpha;
+
+                const halo = this.ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 3.5);
+                halo.addColorStop(0, "rgba(215, 235, 255, 0.35)");
+                halo.addColorStop(0.6, "rgba(160, 195, 245, 0.12)");
+                halo.addColorStop(1, "rgba(100, 150, 240, 0)");
+                this.ctx.fillStyle = halo;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, r * 3.5, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.fillStyle = "#f2f7ff";
+                this.ctx.shadowColor = "rgba(195, 225, 255, 0.7)";
+                this.ctx.shadowBlur = 10;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, r, -Math.PI * 0.32, Math.PI * 0.68, false);
+                this.ctx.quadraticCurveTo(x - r * 0.15, y + r * 0.15, x + r * 0.45, y - r * 0.82);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                this.ctx.restore();
+            }
+
+            drawCloud(cloud) {
+                const { x, y, scale, puffs, baseW, baseH } = cloud;
+                const top = this.current.cloudTop;
+                const mid = this.current.cloudMid;
+                const bot = this.current.cloudBot;
+
+                this.ctx.save();
+                this.ctx.translate(x, y);
+                this.ctx.scale(scale, scale);
+
+                const grad = this.ctx.createLinearGradient(0, -baseH * 0.6, 0, baseH * 0.6);
+                grad.addColorStop(0, `rgba(${top[0] | 0}, ${top[1] | 0}, ${top[2] | 0}, ${top[3]})`);
+                grad.addColorStop(0.45, `rgba(${mid[0] | 0}, ${mid[1] | 0}, ${mid[2] | 0}, ${mid[3]})`);
+                grad.addColorStop(1, `rgba(${bot[0] | 0}, ${bot[1] | 0}, ${bot[2] | 0}, ${bot[3]})`);
+
+                this.ctx.fillStyle = grad;
+                this.ctx.beginPath();
+                for (const p of puffs) {
+                    this.ctx.moveTo(p.dx + p.r, p.dy);
+                    this.ctx.arc(p.dx, p.dy, p.r, 0, Math.PI * 2);
+                }
+                this.ctx.fill();
+
+                if (this.current.sunAlpha > 0.15) {
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${0.16 * this.current.sunAlpha})`;
+                    this.ctx.beginPath();
+                    for (const p of puffs) {
+                        if (p.dy <= 0) {
+                            this.ctx.moveTo(p.dx + p.r * 0.7, p.dy - p.r * 0.18);
+                            this.ctx.arc(p.dx, p.dy - p.r * 0.18, p.r * 0.7, 0, Math.PI * 2);
+                        }
+                    }
+                    this.ctx.fill();
+                }
+
+                this.ctx.restore();
+            }
+
+            updateClouds(dt) {
+                const timeFactor = dt / 16.67;
+                for (const c of this.clouds) {
+                    c.x += c.speed * timeFactor;
+                    if (c.x - c.totalW * 0.5 > this.width) {
+                        c.x = -c.totalW * 0.5;
+                        c.y = (c.yRange[0] + Math.random() * (c.yRange[1] - c.yRange[0])) * this.height;
+                    }
+                }
+            }
+
+            loop(now) {
+                const elapsed = now - this.lastRender;
+                if (elapsed < this.frameInterval) {
+                    this.animId = requestAnimationFrame(t => this.loop(t));
+                    return;
+                }
+                this.lastRender = now - (elapsed % this.frameInterval);
+                const dt = Math.min(elapsed, 100);
+                this.lastTime = now;
+
+                if (this.mode === "auto") {
+                    const currentCalculated = this.getAutoPhase();
+                    if (currentCalculated !== this.activePhase) {
+                        this.syncPhase(false);
+                    }
+                }
+
+                this.updateInterpolation(dt);
+                this.updateClouds(dt);
+
+                this.ctx.clearRect(0, 0, this.width, this.height);
+                this.drawSkyGradient();
+                this.drawStars(now);
+                this.drawSun();
+                this.drawMoon();
+
+                for (const cloud of this.clouds) {
+                    this.drawCloud(cloud);
+                }
+
+                this.animId = requestAnimationFrame(t => this.loop(t));
+            }
+        }
+
+        // Al cargar: retoma la partida en curso, muestra el límite o empieza una nueva
+        function init() {
+            buildBoard();
+            buildKeyboard();
+            new DynamicSky(skyCanvas, skyBtn, skyIcon, metaThemeEl);
+
+            if (!LIMIT_ENABLED) {
+                // Modo prueba: se borran las partidas guardadas de pruebas anteriores
+                storage.remove(STORAGE_KEY);
+                newGame();
+                return;
+            }
+
+            const store = loadStore();
+            saveStore(store);
+
+            if (store.current) {
+                resetGame(store.current.secret);
+                state.started = true;
+                const { guesses } = store.current;
+                const winIndex = guesses.indexOf(state.secret);
+                const played = winIndex === -1 ? guesses : guesses.slice(0, winIndex + 1);
+
+                for (const g of played) {
+                    const result = evaluate(g, state.secret);
+                    paintRow(state.row, g, result);
+                    updateKeyboard(g, result);
+                    state.row++;
+                }
+                updatePlaysInfo(store);
+
+                if (winIndex !== -1) endGame(true);
+                else if (state.row >= MAX_ATTEMPTS) endGame(false);
+            } else if (playsLeft(store) <= 0) {
+                resetGame("");
+                updatePlaysInfo(store);
+                showLimit();
+            } else {
+                newGame();
+            }
+        }
+
+        function handleKey(key) {
+            if (state.busy) return;
+            // Si el cuadro final se cerró con la tachita o Esc para ver el tablero, cualquier tecla lo reabre
+            if (state.over) {
+                openOverlay();
+                return;
+            }
+            if (key === "ENTER") {
+                submitGuess();
+            } else if (key === "BORRAR") {
+                state.guess = state.guess.slice(0, -1);
+                renderRow();
+            } else if (LETTER_RE.test(key) && state.guess.length < WORD_LENGTH) {
+                state.guess += key;
+                renderRow();
+            }
+        }
+
+        function renderRow() {
+            tiles[state.row].forEach((t, c) => {
+                const letter = state.guess[c] ?? "";
+                if (t.textContent !== letter) {
+                    t.textContent = letter;
+                    t.classList.toggle("filled", letter !== "");
+                }
+            });
+        }
+
+        function shakeRow() {
+            const row = rowEls[state.row];
+            row.classList.remove("shake");
+            void row.offsetWidth; // fuerza reflow para reiniciar la animación
+            row.classList.add("shake");
+        }
+
+        function rejectGuess(msg) {
+            shakeRow();
+            showToast(msg);
+            announce(msg);
+        }
+
+        // Con límite activo, la partida cuenta desde la primera palabra enviada.
+        // Devuelve false si ya no quedan partidas.
+        function registerGuess(guess) {
+            const store = loadStore();
+            if (!state.started) {
+                if (playsLeft(store) <= 0) return false;
+                store.plays.push({ t: Date.now(), w: state.secret });
+                store.current = { secret: state.secret, guesses: [] };
+                state.started = true;
+            }
+            store.current ??= { secret: state.secret, guesses: [] }; // otra pestaña pudo cerrarla
+            store.current.guesses.push(guess);
+            saveStore(store);
+            updatePlaysInfo(store);
+            return true;
+        }
+
+        async function revealRow(row, guess, result) {
+            await Promise.all(result.map(async (status, c) => {
+                const t = tiles[row][c];
+                await wait(c * FLIP_STAGGER);
+                t.classList.add("flip");
+                await wait(FLIP_DURATION / 2); // el color cambia con la ficha "de canto"
+                applyTileState(t, guess[c], status);
+                await wait(FLIP_DURATION / 2);
+            }));
+        }
+
+        async function submitGuess() {
+            const { guess, row, secret } = state;
+            if (guess.length < WORD_LENGTH) return rejectGuess("Faltan letras");
+            if (!VALID_WORDS.has(guess)) return rejectGuess("No está en la lista de palabras");
+            if (LIMIT_ENABLED && !registerGuess(guess)) return showLimit();
+
+            state.busy = true;
+            const result = evaluate(guess, secret);
+            await revealRow(row, guess, result);
+            announce(result.map((s, c) => `${guess[c]} ${STATE_LABEL[s]}`).join(", "));
+
+            updateKeyboard(guess, result);
+            state.row++;
+            state.guess = "";
+            state.busy = false;
+
+            if (guess === secret) endGame(true);
+            else if (state.row >= MAX_ATTEMPTS) endGame(false);
+        }
+
+        function updateKeyboard(guess, result) {
+            result.forEach((status, i) => {
+                const letter = guess[i];
+                const prev = state.keyStates.get(letter);
+                if (prev && STATE_RANK[status] <= STATE_RANK[prev]) return;
+                state.keyStates.set(letter, status);
+                const keyEl = keyEls.get(letter);
+                if (!keyEl) return;
+                keyEl.classList.remove(...STATE_CLASSES);
+                keyEl.classList.add(status);
+                keyEl.setAttribute("aria-label", `${letter}, ${STATE_LABEL[status]}`);
+            });
+        }
+
+        async function endGame(won) {
+            state.over = true;
+            if (LIMIT_ENABLED) {
+                const store = loadStore();
+                store.current = null;
+                saveStore(store);
+                updatePlaysInfo(store);
+            }
+            showResult({
+                title: won ? "🎉 ¡Ganaste!" : "😢 Perdiste",
+                text: won
+                    ? `Lo adivinaste en ${state.row} de ${MAX_ATTEMPTS} intentos.`
+                    : "Se acabaron los intentos. La palabra era:",
+                word: state.secret,
+                won
+            });
+            await wait(RESULT_DELAY);
+            openOverlay();
+        }
+
+        function normalizeKey(key) {
+            const upper = key.toUpperCase();
+            return ACCENTS[upper] ?? upper;
+        }
+
+        // ================== Eventos ==================
+        document.addEventListener("keydown", e => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (overlayEl.classList.contains("show")) {
+                if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeOverlay();
+                } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (!restartBtn.disabled) newGame();
+                }
+                return;
+            }
+            // Un botón con foco (navegación con Tab) responde de forma nativa
+            if ((e.key === "Enter" || e.key === " ") && e.target.closest?.("button")) return;
+
+            if (e.key === "Enter") {
+                e.preventDefault();
+                handleKey("ENTER");
+            } else if (e.key === "Backspace") {
+                e.preventDefault();
+                handleKey("BORRAR");
+            } else if (e.key.length === 1) {
+                const letter = normalizeKey(e.key);
+                if (LETTER_RE.test(letter)) handleKey(letter);
+            }
+        });
+
+        // Delegación: un solo listener para todo el teclado en pantalla
+        keyboardEl.addEventListener("click", e => {
+            const btn = e.target.closest("button[data-key]");
+            if (!btn) return;
+            if (e.detail > 0) btn.blur(); // clic con puntero: no dejar el foco en la tecla
+            handleKey(btn.dataset.key);
+        });
+
+        modalCloseBtn.addEventListener("click", closeOverlay);
+        overlayEl.addEventListener("click", e => {
+            if (e.target === overlayEl) closeOverlay();
+        });
+        restartBtn.addEventListener("click", newGame);
+
+        init();
+    </script>
+</body>
+
+</html>
