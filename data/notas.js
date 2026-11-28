@@ -16,7 +16,7 @@ window.NOTAS = [
         titulo: "Hola",
         texto: `“Lo siento, no pretendo cambiarte y no quiero hacerlo, si tu forma de ver las cosas es cargar
 con lo que los demas piensan, entonces carguemos juntos, asi la carga será mas ligera para ti,
-si estas en dia donde el pesismismo te gana, bueno que mas da, entonces yo seré tu contra parte, te daré animos y
+si estas en dia donde el pesimismo te gana, bueno que mas da, entonces yo seré tu contra parte, te daré animos y
 no te dejare sola.
 
 Me complementas y quiero que sepas que no quiero perderte, cuantas veces te puede pasar un caso de serendipia
