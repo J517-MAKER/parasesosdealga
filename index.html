@@ -187,7 +187,8 @@
         <p>Hecho con <span class="beat" aria-label="amor">💗</span> por Alejandro</p>
     </footer>
 
-    <script src="data/notas.js"></script>
+    <!-- Las notas se cargan siempre frescas (evita que el navegador muestre una versión vieja) -->
+    <script>document.write('<script src="data/notas.js?v=' + Date.now() + '"><\/script>');</script>
     <script src="assets/js/sky.js"></script>
     <script src="assets/js/common.js"></script>
     <script src="assets/js/menu.js"></script>
