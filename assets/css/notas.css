@@ -277,11 +277,24 @@
 }
 
 .note-text {
-    margin: 0;
     font-size: 1.02rem;
     line-height: 30px;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+}
+
+.note-text p {
+    margin: 0 0 30px;
+}
+
+.note-text p:last-child {
+    margin-bottom: 0;
+}
+
+.note-quote-author {
+    text-align: right;
+    font-style: italic;
+    color: var(--ink-soft);
 }
 
 .note-sign {

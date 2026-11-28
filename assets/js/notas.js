@@ -120,9 +120,21 @@
             title.className = "note-title";
             title.textContent = n.titulo || "Sin título";
 
-            const text = document.createElement("p");
+            // El texto se acomoda solo: cada línea en blanco separa un párrafo
+            // y los saltos de línea sueltos se unen para que el texto fluya.
+            const text = document.createElement("div");
             text.className = "note-text";
-            text.textContent = n.texto || "";
+            String(n.texto || "")
+                .replace(/\r/g, "")
+                .split(/\n\s*\n/)
+                .map(par => par.split("\n").map(l => l.trim()).filter(Boolean).join(" "))
+                .filter(Boolean)
+                .forEach(par => {
+                    const p = document.createElement("p");
+                    p.textContent = par;
+                    if (/^[—–-]\s/.test(par)) p.className = "note-quote-author";
+                    text.append(p);
+                });
 
             const sign = document.createElement("p");
             sign.className = "note-sign";
