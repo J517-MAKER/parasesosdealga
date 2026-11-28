@@ -14,18 +14,18 @@ window.NOTAS = [
     {
         fecha: "2026-11-28",
         titulo: "Hola",
-        texto: `“Lo siento, no pretendo cambiarte y no quiero hacerlo, si tu forma de ver las cosas es cargar 
-        con lo que los demas piensan, entonces carguemos juntos, asi la carga será mas ligera para ti
-        si estas en dia donde el psismismo te gana, bueno que mas da, entonces yo seré tu contra parte.
-        
-        Me complementas y quiero que sepas que no quiero perderte, cuantas veces te puede pasar un caso de Serendipia 
-        en la vida.
-        Lucía, si tan solo pudieras sentir por un momento que mis sentimientos hacia ti son tan genuinos y fuertes.
-        
-        Hace mucho te dije que te queria decir algo de dos palabras y me dijiste, puedo intuir cuales son, me dio miedo
-        y te terine diciendo que era un simple "Me encantas" pero la verdad es que era un
-        
-        Te quiero”`
+        texto: `“Lo siento, no pretendo cambiarte y no quiero hacerlo, si tu forma de ver las cosas es cargar
+con lo que los demas piensan, entonces carguemos juntos, asi la carga será mas ligera para ti
+si estas en dia donde el psismismo te gana, bueno que mas da, entonces yo seré tu contra parte.
+
+Me complementas y quiero que sepas que no quiero perderte, cuantas veces te puede pasar un caso de Serendipia
+en la vida.
+Lucía, si tan solo pudieras sentir por un momento que mis sentimientos hacia ti son tan genuinos y fuertes.
+
+Hace mucho te dije que te queria decir algo de dos palabras y me dijiste, puedo intuir cuales son, me dio miedo
+y te terine diciendo que era un simple "Me encantas" pero la verdad es que era un
+
+Te quiero”`
     },
     {
         fecha: "2026-11-20",
@@ -33,7 +33,5 @@ window.NOTAS = [
         texto: `“Lo que uno quiere de verdad, es lo que está hecho para uno; entonces hay que tomarlo, o intentar.”
 
 — Mario Benedetti`
-    }
-];
     }
 ];
